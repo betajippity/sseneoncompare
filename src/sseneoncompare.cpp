@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cmath>
 #include <chrono>
+#include <xmmintrin.h>
+#include <bitset>
 
 struct Timer {
     std::chrono::high_resolution_clock::time_point m_startTime;
@@ -18,7 +20,8 @@ struct Timer {
 };
 
 struct FVec4 {
-    union {
+    union {  // Use union for type punning __m128
+        __m128 m128;
         struct {
             float x;
             float y;
@@ -29,6 +32,8 @@ struct FVec4 {
     };
 
     FVec4() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
+    FVec4(__m128 f4) : m128(f4) {}
+
     FVec4(float x_, float y_, float z_, float w_) : x(x_), y(y_), z(z_), w(w_) {}
     FVec4(float x_, float y_, float z_) : x(x_), y(y_), z(z_), w(0.0f) {}
 
@@ -77,6 +82,37 @@ struct BBox {
         cornersAlt[1][0] = std::max(minCorner.x, maxCorner.x);
         cornersAlt[1][1] = std::max(minCorner.y, maxCorner.y);
         cornersAlt[1][2] = std::max(minCorner.x, maxCorner.x);
+    }
+
+    FVec4 minCorner() const { return FVec4(corners[0], corners[1], corners[2]); }
+
+    FVec4 maxCorner() const { return FVec4(corners[3], corners[4], corners[5]); }
+};
+
+struct BBox4 {
+    union {
+        __m128 corners[6];            // order: minX, minY, minZ, maxX, maxY, maxZ
+        float cornersFloat[2][3][4];  // indexed as corner[minOrMax][XYZ][bboxNumber]
+    };
+
+    inline __m128* minCorner() { return &corners[0]; }
+
+    inline __m128* maxCorner() { return &corners[3]; }
+
+    inline void setBBox(int boxNum, const FVec4& minCorner, const FVec4& maxCorner) {
+        cornersFloat[0][0][boxNum] = std::min(minCorner.x, maxCorner.x);
+        cornersFloat[0][1][boxNum] = std::min(minCorner.y, maxCorner.y);
+        cornersFloat[0][2][boxNum] = std::min(minCorner.z, maxCorner.z);
+        cornersFloat[1][0][boxNum] = std::max(minCorner.x, maxCorner.x);
+        cornersFloat[1][1][boxNum] = std::max(minCorner.y, maxCorner.y);
+        cornersFloat[1][2][boxNum] = std::max(minCorner.x, maxCorner.x);
+    }
+
+    BBox4(const BBox& a, const BBox& b, const BBox& c, const BBox& d) {
+        setBBox(0, a.minCorner(), a.maxCorner());
+        setBBox(1, b.minCorner(), b.maxCorner());
+        setBBox(2, c.minCorner(), c.maxCorner());
+        setBBox(3, d.minCorner(), d.maxCorner());
     }
 };
 
@@ -178,6 +214,44 @@ void rayBBoxIntersect4ScalarCompact(const Ray& ray,
     hits[3] = (int)rayBBoxIntersectScalarCompact(ray, bbox3, tMins[3], tMaxs[3]);
 }
 
+// SSE version of the compact Williams et al. 2005 implementation
+void rayBBoxIntersect4SSE(const Ray& ray,
+                          const BBox4& bbox4,
+                          IVec4& hits,
+                          FVec4& tMins,
+                          FVec4& tMaxs) {
+    FVec4 rdir(_mm_set1_ps(1.0f) / ray.direction.m128);
+    /* use _mm_shuffle_ps, which translates to a single instruction while _mm_set1_ps involves a
+       MOVSS + a shuffle */
+    FVec4 rdirX(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(0, 0, 0, 0)));
+    FVec4 rdirY(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(1, 1, 1, 1)));
+    FVec4 rdirZ(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(2, 2, 2, 2)));
+    FVec4 originX(_mm_set1_ps(ray.origin.x));
+    FVec4 originY(_mm_set1_ps(ray.origin.y));
+    FVec4 originZ(_mm_set1_ps(ray.origin.z));
+
+    IVec4 near(int(rdir.x >= 0.0f ? 0 : 3), int(rdir.y >= 0.0f ? 1 : 4),
+               int(rdir.z >= 0.0f ? 2 : 5));
+    IVec4 far(int(rdir.x >= 0.0f ? 3 : 0), int(rdir.y >= 0.0f ? 4 : 1),
+              int(rdir.z >= 0.0f ? 5 : 2));
+
+    tMins = FVec4(_mm_max_ps(
+        _mm_max_ps(_mm_set1_ps(ray.tMin), (bbox4.corners[near.x] - originX.m128) * rdirX.m128),
+        _mm_max_ps((bbox4.corners[near.y] - originY.m128) * rdirY.m128,
+                   (bbox4.corners[near.z] - originZ.m128) * rdirZ.m128)));
+    tMaxs = FVec4(_mm_min_ps(
+        _mm_min_ps(_mm_set1_ps(ray.tMax), (bbox4.corners[far.x] - originX.m128) * rdirX.m128),
+        _mm_min_ps((bbox4.corners[far.y] - originY.m128) * rdirY.m128,
+                   (bbox4.corners[far.z] - originZ.m128) * rdirZ.m128)));
+
+    int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
+    std::bitset<4> hitMask(hit);
+    hits[0] = (int)hitMask[0];
+    hits[1] = (int)hitMask[1];
+    hits[2] = (int)hitMask[2];
+    hits[3] = (int)hitMask[3];
+}
+
 int main() {
     Ray ray(FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f);
     BBox bbox0(FVec4(-0.5f, -0.5f, -0.5f), FVec4(0.5f, 0.5f, 0.5f));
@@ -215,6 +289,14 @@ int main() {
         rayBBoxIntersect4ScalarCompact(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
     printResults("Scalar Compact", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
+
+    BBox4 bbox4(bbox0, bbox1, bbox2, bbox3);
+
+    timer.start();
+    for (int i = 0; i < 1000; i++) {
+        rayBBoxIntersect4SSE(ray, bbox4, hits, tMins, tMaxs);
+    }
+    printResults("SSE", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 
     return 0;
 }
