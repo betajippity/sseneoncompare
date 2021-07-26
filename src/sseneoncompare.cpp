@@ -344,14 +344,16 @@ int main() {
     IVec4 hits;
     FVec4 tMins, tMaxs;
 
+    const int numTests = 1000;
+
     Timer timer;
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < numTests; i++) {
         rayBBoxIntersect4Scalar(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
     printResults("Scalar", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 
     timer.start();
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < numTests; i++) {
         rayBBoxIntersect4ScalarCompact(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
     printResults("Scalar Compact", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
@@ -359,7 +361,7 @@ int main() {
     BBox4 bbox4(bbox0, bbox1, bbox2, bbox3);
 
     timer.start();
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < numTests; i++) {
         rayBBoxIntersect4SSE(ray, bbox4, hits, tMins, tMaxs);
     }
 #if defined(__x86_64__)
@@ -370,7 +372,7 @@ int main() {
 
 #if defined(__aarch64__)
     timer.start();
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < numTests; i++) {
         rayBBoxIntersect4Neon(ray, bbox4, hits, tMins, tMaxs);
     }
     printResults("Neon", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
