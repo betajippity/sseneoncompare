@@ -5,6 +5,7 @@
 #if defined(__x86_64__)
 #include <xmmintrin.h>
 #elif defined(__aarch64__)
+#include <arm_neon.h>
 #include "sse2neon/sse2neon.h"
 #endif
 
@@ -24,8 +25,11 @@ struct Timer {
 };
 
 struct FVec4 {
-    union {  // Use union for type punning __m128
+    union {  // Use union for type punning __m128 and float32x4_t
         __m128 m128;
+#if defined(__aarch64__)
+        float32x4_t f32x4;
+#endif
         struct {
             float x;
             float y;
@@ -36,7 +40,11 @@ struct FVec4 {
     };
 
     FVec4() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
+#if defined(__x86_64__)
     FVec4(__m128 f4) : m128(f4) {}
+#elif defined(__aarch64__)
+    FVec4(float32x4_t f4) : f32x4(f4) {}
+#endif
 
     FVec4(float x_, float y_, float z_, float w_) : x(x_), y(y_), z(z_), w(w_) {}
     FVec4(float x_, float y_, float z_) : x(x_), y(y_), z(z_), w(0.0f) {}
@@ -95,13 +103,20 @@ struct BBox {
 
 struct BBox4 {
     union {
-        __m128 corners[6];            // order: minX, minY, minZ, maxX, maxY, maxZ
+        __m128 cornersSSE[6];  // order: minX, minY, minZ, maxX, maxY, maxZ
+#if defined(__aarch64__)
+        float32x4_t cornersNeon[6];
+#endif
         float cornersFloat[2][3][4];  // indexed as corner[minOrMax][XYZ][bboxNumber]
     };
 
-    inline __m128* minCorner() { return &corners[0]; }
+    inline __m128* minCornerSSE() { return &cornersSSE[0]; }
+    inline __m128* maxCornerSSE() { return &cornersSSE[3]; }
 
-    inline __m128* maxCorner() { return &corners[3]; }
+#if defined(__aarch64__)
+    inline float32x4_t* minCornerNeon() { return &cornersNeon[0]; }
+    inline float32x4_t* maxCornerNeon() { return &cornersNeon[3]; }
+#endif
 
     inline void setBBox(int boxNum, const FVec4& minCorner, const FVec4& maxCorner) {
         cornersFloat[0][0][boxNum] = std::min(minCorner.x, maxCorner.x);
@@ -240,13 +255,13 @@ void rayBBoxIntersect4SSE(const Ray& ray,
               int(rdir.z >= 0.0f ? 5 : 2));
 
     tMins = FVec4(_mm_max_ps(
-        _mm_max_ps(_mm_set1_ps(ray.tMin), (bbox4.corners[near.x] - originX.m128) * rdirX.m128),
-        _mm_max_ps((bbox4.corners[near.y] - originY.m128) * rdirY.m128,
-                   (bbox4.corners[near.z] - originZ.m128) * rdirZ.m128)));
+        _mm_max_ps(_mm_set1_ps(ray.tMin), (bbox4.cornersSSE[near.x] - originX.m128) * rdirX.m128),
+        _mm_max_ps((bbox4.cornersSSE[near.y] - originY.m128) * rdirY.m128,
+                   (bbox4.cornersSSE[near.z] - originZ.m128) * rdirZ.m128)));
     tMaxs = FVec4(_mm_min_ps(
-        _mm_min_ps(_mm_set1_ps(ray.tMax), (bbox4.corners[far.x] - originX.m128) * rdirX.m128),
-        _mm_min_ps((bbox4.corners[far.y] - originY.m128) * rdirY.m128,
-                   (bbox4.corners[far.z] - originZ.m128) * rdirZ.m128)));
+        _mm_min_ps(_mm_set1_ps(ray.tMax), (bbox4.cornersSSE[far.x] - originX.m128) * rdirX.m128),
+        _mm_min_ps((bbox4.cornersSSE[far.y] - originY.m128) * rdirY.m128,
+                   (bbox4.cornersSSE[far.z] - originZ.m128) * rdirZ.m128)));
 
     int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
     hits[0] = bool(hit & (1 << (0)));
@@ -254,6 +269,55 @@ void rayBBoxIntersect4SSE(const Ray& ray,
     hits[2] = bool(hit & (1 << (2)));
     hits[3] = bool(hit & (1 << (3)));
 }
+
+#if defined(__aarch64__)
+
+inline uint32_t neonCompareAndMask(const float32x4_t& a, const float32x4_t& b) {
+    float32x4_t comparisonResult = vreinterpretq_f32_u32(vcleq_f32(a, b));
+    uint32x4_t compResUint = vreinterpretq_u32_f32(comparisonResult);
+    static const int32x4_t shift = { 0, 1, 2, 3 };
+    uint32x4_t tmp = vshrq_n_u32(compResUint, 31);
+    return vaddvq_u32(vshlq_u32(tmp, shift));
+}
+
+// Neon version of the compact Williams et al. 2005 implementation
+void rayBBoxIntersect4Neon(const Ray& ray,
+                           const BBox4& bbox4,
+                           IVec4& hits,
+                           FVec4& tMins,
+                           FVec4& tMaxs) {
+    FVec4 rdir(vdupq_n_f32(1.0f) / ray.direction.f32x4);
+    /* since NEON doesn't have a single-instruction equivalent to _mm_shuffle_ps, we just take
+       the slow route here and load into each float32x4_t */
+    FVec4 rdirX(vdupq_n_f32(rdir.x));
+    FVec4 rdirY(vdupq_n_f32(rdir.y));
+    FVec4 rdirZ(vdupq_n_f32(rdir.z));
+    FVec4 originX(vdupq_n_f32(ray.origin.x));
+    FVec4 originY(vdupq_n_f32(ray.origin.y));
+    FVec4 originZ(vdupq_n_f32(ray.origin.z));
+
+    IVec4 near(int(rdir.x >= 0.0f ? 0 : 3), int(rdir.y >= 0.0f ? 1 : 4),
+               int(rdir.z >= 0.0f ? 2 : 5));
+    IVec4 far(int(rdir.x >= 0.0f ? 3 : 0), int(rdir.y >= 0.0f ? 4 : 1),
+              int(rdir.z >= 0.0f ? 5 : 2));
+
+    tMins = FVec4(vmaxq_f32(
+        vmaxq_f32(vdupq_n_f32(ray.tMin), (bbox4.cornersNeon[near.x] - originX.f32x4) * rdirX.f32x4),
+        vmaxq_f32((bbox4.cornersNeon[near.y] - originY.f32x4) * rdirY.f32x4,
+                  (bbox4.cornersNeon[near.z] - originZ.f32x4) * rdirZ.f32x4)));
+    tMaxs = FVec4(vminq_f32(
+        vminq_f32(vdupq_n_f32(ray.tMax), (bbox4.cornersNeon[far.x] - originX.f32x4) * rdirX.f32x4),
+        vminq_f32((bbox4.cornersNeon[far.y] - originY.f32x4) * rdirY.f32x4,
+                  (bbox4.cornersNeon[far.z] - originZ.f32x4) * rdirZ.f32x4)));
+
+    uint32_t hit = neonCompareAndMask(tMins.f32x4, tMaxs.f32x4);
+    hits[0] = bool(hit & (1 << (0)));
+    hits[1] = bool(hit & (1 << (1)));
+    hits[2] = bool(hit & (1 << (2)));
+    hits[3] = bool(hit & (1 << (3)));
+}
+
+#endif
 
 int main() {
     Ray ray(FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f);
@@ -303,6 +367,14 @@ int main() {
     printResults("SSE", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 #elif defined(__aarch64__)
     printResults("SSE (via sse2neon)", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
+#endif
+
+#if defined(__aarch64__)
+    timer.start();
+    for (int i = 0; i < 1000; i++) {
+        rayBBoxIntersect4Neon(ray, bbox4, hits, tMins, tMaxs);
+    }
+    printResults("Neon", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 #endif
 
     return 0;
