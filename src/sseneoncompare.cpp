@@ -2,8 +2,6 @@
 #include <cmath>
 #include <chrono>
 
-#define COMPACT
-
 struct Timer {
     std::chrono::high_resolution_clock::time_point m_startTime;
 
@@ -87,13 +85,14 @@ struct Ray {
     FVec4 origin;
     float tMin;
     float tMax;
+
+    Ray(const FVec4& direction_, const FVec4& origin_, float tMin_, float tMax_)
+        : direction(direction_), origin(origin_), tMin(tMin_), tMax(tMax_) {}
 };
 
-#ifndef COMPACT
-
-/* A direct implementation of "An Efficient and Robust Ray-Box Intersection
-   Algorithm" by Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
-bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
+/* A direct implementation of "An Efficient and Robust Ray-Box Intersection Algorithm" by
+   Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
+bool rayBBoxIntersectScalar(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
     FVec4 rdir = 1.0f / ray.direction;
     int sign[3];
     sign[0] = (rdir.x < 0);
@@ -128,11 +127,9 @@ bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax
     return ((tMin < ray.tMax) && (tMax > ray.tMin));
 }
 
-#else
-
 /* A much more compact implementation of Williams et al. 2005; this implementation does not
    calculate a negative tMin if the ray origin is inside of the box. */
-bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
+bool rayBBoxIntersectScalarCompact(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
     FVec4 rdir = 1.0f / ray.direction;
     IVec4 near(int(rdir.x >= 0.0f ? 0 : 3), int(rdir.y >= 0.0f ? 1 : 4),
                int(rdir.z >= 0.0f ? 2 : 5));
@@ -153,45 +150,71 @@ bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax
     }
 }
 
-#endif
+void rayBBoxIntersect4Scalar(const Ray& ray,
+                             const BBox& bbox0,
+                             const BBox& bbox1,
+                             const BBox& bbox2,
+                             const BBox& bbox3,
+                             IVec4& hits,
+                             FVec4& tMins,
+                             FVec4& tMaxs) {
+    hits[0] = (int)rayBBoxIntersectScalar(ray, bbox0, tMins[0], tMaxs[0]);
+    hits[1] = (int)rayBBoxIntersectScalar(ray, bbox1, tMins[1], tMaxs[1]);
+    hits[2] = (int)rayBBoxIntersectScalar(ray, bbox2, tMins[2], tMaxs[2]);
+    hits[3] = (int)rayBBoxIntersectScalar(ray, bbox3, tMins[3], tMaxs[3]);
+}
 
-void rayBBoxIntersect4(const Ray& ray,
-                       const BBox& bbox0,
-                       const BBox& bbox1,
-                       const BBox& bbox2,
-                       const BBox& bbox3,
-                       IVec4& hits,
-                       FVec4& tMins,
-                       FVec4& tMaxs) {
-    hits[0] = (int)rayBBoxIntersect(ray, bbox0, tMins[0], tMaxs[0]);
-    hits[1] = (int)rayBBoxIntersect(ray, bbox1, tMins[1], tMaxs[1]);
-    hits[2] = (int)rayBBoxIntersect(ray, bbox2, tMins[2], tMaxs[2]);
-    hits[3] = (int)rayBBoxIntersect(ray, bbox3, tMins[3], tMaxs[3]);
+void rayBBoxIntersect4ScalarCompact(const Ray& ray,
+                                    const BBox& bbox0,
+                                    const BBox& bbox1,
+                                    const BBox& bbox2,
+                                    const BBox& bbox3,
+                                    IVec4& hits,
+                                    FVec4& tMins,
+                                    FVec4& tMaxs) {
+    hits[0] = (int)rayBBoxIntersectScalarCompact(ray, bbox0, tMins[0], tMaxs[0]);
+    hits[1] = (int)rayBBoxIntersectScalarCompact(ray, bbox1, tMins[1], tMaxs[1]);
+    hits[2] = (int)rayBBoxIntersectScalarCompact(ray, bbox2, tMins[2], tMaxs[2]);
+    hits[3] = (int)rayBBoxIntersectScalarCompact(ray, bbox3, tMins[3], tMaxs[3]);
 }
 
 int main() {
-    Ray ray{ FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f };
+    Ray ray(FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f);
     BBox bbox0(FVec4(-0.5f, -0.5f, -0.5f), FVec4(0.5f, 0.5f, 0.5f));
     BBox bbox1(FVec4(1.5f, 1.5f, 1.5f), FVec4(2.0f, 2.0f, 2.0f));
     BBox bbox2(FVec4(-2.0f, -2.0f, -2.0f), FVec4(2.0f, 2.0f, 2.0f));
     BBox bbox3(FVec4(-1.5f, -1.5f, -1.5f), FVec4(-2.0f, -2.0f, -2.0f));
+
+    auto printResults = [&](const std::string& testName, int elapsedMicroSec, const IVec4& hits,
+                            const FVec4& tMins, const FVec4& tMaxs) {
+        std::cout << testName << ": " << elapsedMicroSec << " μs" << std::endl;
+        for (size_t i = 0; i < 4; i++) {
+            std::cout << "  Box " << i << " hit: " << (hits[i] == 1 ? "true" : "false")
+                      << std::endl;
+            if (hits[i]) {
+                std::cout << "      tMin: "
+                          << (tMins[i] > 0.0f ? std::to_string(tMins[i]) : "inside box")
+                          << std::endl;
+                std::cout << "      tMax: " << tMaxs[i] << std::endl;
+            }
+        }
+        std::cout << std::endl;
+    };
+
     IVec4 hits;
     FVec4 tMins, tMaxs;
 
     Timer timer;
     for (int i = 0; i < 1000; i++) {
-        rayBBoxIntersect4(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
+        rayBBoxIntersect4Scalar(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
-    std::cout << timer.getElapsedMicoSec() << " μs" << std::endl;
+    printResults("Scalar", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 
-    for (size_t i = 0; i < 4; i++) {
-        std::cout << "Box " << i << " hit: " << (hits[i] == 1 ? "true" : "false") << std::endl;
-        if (hits[i]) {
-            std::cout << "  tMin: " << (tMins[i] > 0.0f ? std::to_string(tMins[i]) : "inside box")
-                      << std::endl;
-            std::cout << "  tMax: " << tMaxs[i] << std::endl;
-        }
+    timer.start();
+    for (int i = 0; i < 1000; i++) {
+        rayBBoxIntersect4ScalarCompact(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
+    printResults("Scalar Compact", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
 
     return 0;
 }
