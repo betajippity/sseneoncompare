@@ -2,6 +2,8 @@
 #include <cmath>
 #include <chrono>
 
+#define COMPACT
+
 struct Timer {
     std::chrono::high_resolution_clock::time_point m_startTime;
 
@@ -87,8 +89,10 @@ struct Ray {
     float tMax;
 };
 
-/* A direct implementation of "An Efficient and Robust Ray-Box Intersection Algorithm" by
-   Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
+#ifndef COMPACT
+
+/* A direct implementation of "An Efficient and Robust Ray-Box Intersection
+   Algorithm" by Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
 bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
     FVec4 rdir = 1.0f / ray.direction;
     int sign[3];
@@ -123,6 +127,33 @@ bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax
     }
     return ((tMin < ray.tMax) && (tMax > ray.tMin));
 }
+
+#else
+
+/* A much more compact implementation of Williams et al. 2005; this implementation does not
+   calculate a negative tMin if the ray origin is inside of the box. */
+bool rayBBoxIntersect(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
+    FVec4 rdir = 1.0f / ray.direction;
+    IVec4 near(int(rdir.x >= 0.0f ? 0 : 3), int(rdir.y >= 0.0f ? 1 : 4),
+               int(rdir.z >= 0.0f ? 2 : 5));
+    IVec4 far(int(rdir.x >= 0.0f ? 3 : 0), int(rdir.y >= 0.0f ? 4 : 1),
+              int(rdir.z >= 0.0f ? 5 : 2));
+
+    tMin = std::max(std::max(ray.tMin, (bbox.corners[near.x] - ray.origin.x) * rdir.x),
+                    std::max((bbox.corners[near.y] - ray.origin.y) * rdir.y,
+                             (bbox.corners[near.z] - ray.origin.z) * rdir.z));
+    tMax = std::min(std::min(ray.tMax, (bbox.corners[far.x] - ray.origin.x) * rdir.x),
+                    std::min((bbox.corners[far.y] - ray.origin.y) * rdir.y,
+                             (bbox.corners[far.z] - ray.origin.z) * rdir.z));
+
+    if (std::isnan(tMin) || std::isnan(tMax) || std::isinf(tMin) || std::isinf(tMax)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+#endif
 
 void rayBBoxIntersect4(const Ray& ray,
                        const BBox& bbox0,
