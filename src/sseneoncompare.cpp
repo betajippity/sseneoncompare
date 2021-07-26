@@ -1,7 +1,12 @@
 #include <iostream>
 #include <cmath>
 #include <chrono>
+
+#if defined(__x86_64__)
 #include <xmmintrin.h>
+#elif defined(__aarch64__)
+#include "sse2neon/sse2neon.h"
+#endif
 
 struct Timer {
     std::chrono::high_resolution_clock::time_point m_startTime;
@@ -294,7 +299,11 @@ int main() {
     for (int i = 0; i < 1000; i++) {
         rayBBoxIntersect4SSE(ray, bbox4, hits, tMins, tMaxs);
     }
+#if defined(__x86_64__)
     printResults("SSE", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
+#elif defined(__aarch64__)
+    printResults("SSE (via sse2neon)", timer.getElapsedMicoSec(), hits, tMins, tMaxs);
+#endif
 
     return 0;
 }
