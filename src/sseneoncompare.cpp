@@ -2,7 +2,6 @@
 #include <cmath>
 #include <chrono>
 #include <xmmintrin.h>
-#include <bitset>
 
 struct Timer {
     std::chrono::high_resolution_clock::time_point m_startTime;
@@ -245,11 +244,10 @@ void rayBBoxIntersect4SSE(const Ray& ray,
                    (bbox4.corners[far.z] - originZ.m128) * rdirZ.m128)));
 
     int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
-    std::bitset<4> hitMask(hit);
-    hits[0] = (int)hitMask[0];
-    hits[1] = (int)hitMask[1];
-    hits[2] = (int)hitMask[2];
-    hits[3] = (int)hitMask[3];
+    hits[0] = bool(hit & (1 << (0)));
+    hits[1] = bool(hit & (1 << (1)));
+    hits[2] = bool(hit & (1 << (2)));
+    hits[3] = bool(hit & (1 << (3)));
 }
 
 int main() {
