@@ -273,8 +273,7 @@ void rayBBoxIntersect4SSE(const Ray& ray,
 #if defined(__aarch64__)
 
 inline uint32_t neonCompareAndMask(const float32x4_t& a, const float32x4_t& b) {
-    float32x4_t comparisonResult = vreinterpretq_f32_u32(vcleq_f32(a, b));
-    uint32x4_t compResUint = vreinterpretq_u32_f32(comparisonResult);
+    uint32x4_t compResUint = vcleq_f32(a, b);
     static const int32x4_t shift = { 0, 1, 2, 3 };
     uint32x4_t tmp = vshrq_n_u32(compResUint, 31);
     return vaddvq_u32(vshlq_u32(tmp, shift));
