@@ -2,3 +2,7 @@ old/
 build/
 *DS_Store
 sseneoncompare
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
