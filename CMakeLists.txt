@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(SOURCE_FILES "src/sseneoncompare.cpp")
+set(SOURCE_FILES ${SOURCE_FILES} "src/main.cpp")
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")

@@ -1,149 +1,4 @@
-#include <iostream>
-#include <cmath>
-#include <chrono>
-
-#if defined(__x86_64__)
-#include <xmmintrin.h>
-#elif defined(__aarch64__)
-#include <arm_neon.h>
-#include "sse2neon/sse2neon.h"
-#endif
-
-struct Timer {
-    std::chrono::steady_clock::time_point m_startTime;
-
-    Timer() { m_startTime = std::chrono::steady_clock::now(); }
-    void start() { m_startTime = std::chrono::steady_clock::now(); }
-
-    long getElapsedMicroSec() const {
-        auto end_time = std::chrono::steady_clock::now();
-        return (long)std::min(
-            (long)std::chrono::duration_cast<std::chrono::microseconds>(end_time - m_startTime)
-                .count(),
-            std::numeric_limits<long>::max());
-    }
-};
-
-struct FVec4 {
-    union {  // Use union for type punning __m128 and float32x4_t
-        __m128 m128;
-#if defined(__aarch64__)
-        float32x4_t f32x4;
-#endif
-        struct {
-            float x;
-            float y;
-            float z;
-            float w;
-        };
-        float data[4];
-    };
-
-    FVec4() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
-#if defined(__x86_64__)
-    FVec4(__m128 f4) : m128(f4) {}
-#elif defined(__aarch64__)
-    FVec4(float32x4_t f4) : f32x4(f4) {}
-#endif
-
-    FVec4(float x_, float y_, float z_, float w_) : x(x_), y(y_), z(z_), w(w_) {}
-    FVec4(float x_, float y_, float z_) : x(x_), y(y_), z(z_), w(0.0f) {}
-
-    float operator[](int i) const { return data[i]; }
-    float& operator[](int i) { return data[i]; }
-
-    FVec4 operator+(const FVec4& b) { return FVec4(x + b.x, y + b.y, z + b.z, w + b.w); }
-    FVec4 operator-(const FVec4& b) { return FVec4(x - b.x, y - b.y, z - b.z, w - b.w); }
-    FVec4 operator*(const float& b) { return FVec4(x * b, y * b, z * b, w * b); }
-    FVec4 operator/(const float& b) { return FVec4(x / b, y / b, z / b, w / b); }
-};
-
-FVec4 operator/(const float& a, const FVec4& b) {
-    return FVec4(a / b.x, a / b.y, a / b.z, a / b.w);
-}
-
-struct IVec4 {
-    union {
-        struct {
-            int x;
-            int y;
-            int z;
-            int w;
-        };
-        int data[4];
-    };
-
-    IVec4() : x(0), y(0), z(0), w(0) {}
-    IVec4(int x_, int y_, int z_, int w_) : x(x_), y(y_), z(z_), w(w_) {}
-    IVec4(int x_, int y_, int z_) : x(x_), y(y_), z(z_), w(0) {}
-
-    int operator[](int i) const { return data[i]; }
-    int& operator[](int i) { return data[i]; }
-};
-
-struct BBox {
-    union {
-        float corners[6];        // indexed as [minX minY minZ maxX maxY maxZ]
-        float cornersAlt[2][3];  // indexed as corner[minOrMax][XYZ]
-    };
-
-    BBox(const FVec4& minCorner, const FVec4& maxCorner) {
-        cornersAlt[0][0] = fmin(minCorner.x, maxCorner.x);
-        cornersAlt[0][1] = fmin(minCorner.y, maxCorner.y);
-        cornersAlt[0][2] = fmin(minCorner.z, maxCorner.z);
-        cornersAlt[1][0] = fmax(minCorner.x, maxCorner.x);
-        cornersAlt[1][1] = fmax(minCorner.y, maxCorner.y);
-        cornersAlt[1][2] = fmax(minCorner.x, maxCorner.x);
-    }
-
-    FVec4 minCorner() const { return FVec4(corners[0], corners[1], corners[2]); }
-
-    FVec4 maxCorner() const { return FVec4(corners[3], corners[4], corners[5]); }
-};
-
-struct BBox4 {
-    union {
-        __m128 cornersSSE[6];  // order: minX, minY, minZ, maxX, maxY, maxZ
-#if defined(__aarch64__)
-        float32x4_t cornersNeon[6];
-#endif
-        float cornersFloat[2][3][4];  // indexed as corner[minOrMax][XYZ][bboxNumber]
-    };
-
-    inline __m128* minCornerSSE() { return &cornersSSE[0]; }
-    inline __m128* maxCornerSSE() { return &cornersSSE[3]; }
-
-#if defined(__aarch64__)
-    inline float32x4_t* minCornerNeon() { return &cornersNeon[0]; }
-    inline float32x4_t* maxCornerNeon() { return &cornersNeon[3]; }
-#endif
-
-    inline void setBBox(int boxNum, const FVec4& minCorner, const FVec4& maxCorner) {
-        cornersFloat[0][0][boxNum] = fmin(minCorner.x, maxCorner.x);
-        cornersFloat[0][1][boxNum] = fmin(minCorner.y, maxCorner.y);
-        cornersFloat[0][2][boxNum] = fmin(minCorner.z, maxCorner.z);
-        cornersFloat[1][0][boxNum] = fmax(minCorner.x, maxCorner.x);
-        cornersFloat[1][1][boxNum] = fmax(minCorner.y, maxCorner.y);
-        cornersFloat[1][2][boxNum] = fmax(minCorner.x, maxCorner.x);
-    }
-
-    BBox4(const BBox& a, const BBox& b, const BBox& c, const BBox& d) {
-        setBBox(0, a.minCorner(), a.maxCorner());
-        setBBox(1, b.minCorner(), b.maxCorner());
-        setBBox(2, c.minCorner(), c.maxCorner());
-        setBBox(3, d.minCorner(), d.maxCorner());
-    }
-};
-
-struct Ray {
-    FVec4 direction;
-    FVec4 origin;
-    float tMin;
-    float tMax;
-
-    Ray(const FVec4& direction_, const FVec4& origin_, float tMin_, float tMax_)
-        : direction(direction_), origin(origin_), tMin(tMin_), tMax(tMax_) {}
-};
+#include "sseneoncompare.hpp"
 
 /* A direct implementation of "An Efficient and Robust Ray-Box Intersection Algorithm" by
    Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
@@ -318,64 +173,52 @@ void rayBBoxIntersect4Neon(const Ray& ray,
 
 #endif
 
-int main() {
-    Ray ray(FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f);
-    BBox bbox0(FVec4(-0.5f, -0.5f, -0.5f), FVec4(0.5f, 0.5f, 0.5f));
-    BBox bbox1(FVec4(1.5f, 1.5f, 1.5f), FVec4(2.0f, 2.0f, 2.0f));
-    BBox bbox2(FVec4(-2.0f, -2.0f, -2.0f), FVec4(2.0f, 2.0f, 2.0f));
-    BBox bbox3(FVec4(-1.5f, -1.5f, -1.5f), FVec4(-2.0f, -2.0f, -2.0f));
-    BBox4 bbox4(bbox0, bbox1, bbox2, bbox3);
+// Compact scalar version written to be easily autovectorized
+void rayBBoxIntersect4AutoVectorize(const Ray& ray,
+                                    const BBox4& bbox4,
+                                    IVec4& hits,
+                                    FVec4& tMins,
+                                    FVec4& tMaxs) {
+    float rdir[3] = { 1.0f / ray.direction.x, 1.0f / ray.direction.y, 1.0f / ray.direction.z };
+    float rdirX[4] = { rdir[0], rdir[0], rdir[0], rdir[0] };
+    float rdirY[4] = { rdir[1], rdir[1], rdir[1], rdir[1] };
+    float rdirZ[4] = { rdir[2], rdir[2], rdir[2], rdir[2] };
+    float originX[4] = { ray.origin.x, ray.origin.x, ray.origin.x, ray.origin.x };
+    float originY[4] = { ray.origin.y, ray.origin.y, ray.origin.y, ray.origin.y };
+    float originZ[4] = { ray.origin.z, ray.origin.z, ray.origin.z, ray.origin.z };
+    float rtMin[4] = { ray.tMin, ray.tMin, ray.tMin, ray.tMin };
+    float rtMax[4] = { ray.tMax, ray.tMax, ray.tMax, ray.tMax };
 
-    auto printResults = [&](const std::string& testName, long elapsedMicroSec, const IVec4& hits,
-                            const FVec4& tMins, const FVec4& tMaxs) {
-        std::cout << testName << ": " << elapsedMicroSec << " μs" << std::endl;
-        for (size_t i = 0; i < 4; i++) {
-            std::cout << "  Box " << i << " hit: " << (hits[i] == 1 ? "true" : "false")
-                      << std::endl;
-            if (hits[i]) {
-                std::cout << "      tMin: "
-                          << (tMins[i] > 0.0f ? std::to_string(tMins[i]) : "inside box")
-                          << std::endl;
-                std::cout << "      tMax: " << tMaxs[i] << std::endl;
-            }
-        }
-        std::cout << std::endl;
-    };
+    IVec4 near(int(rdir[0] >= 0.0f ? 0 : 3), int(rdir[1] >= 0.0f ? 1 : 4),
+               int(rdir[2] >= 0.0f ? 2 : 5));
+    IVec4 far(int(rdir[0] >= 0.0f ? 3 : 0), int(rdir[1] >= 0.0f ? 4 : 1),
+              int(rdir[2] >= 0.0f ? 5 : 2));
 
-    IVec4 hits;
-    FVec4 tMins, tMaxs;
+    float product0[4];
 
-    const int numTests = 1000;
+#pragma clang loop vectorize(enable)
+    for (int i = 0; i < 4; i++) {
+        product0[i] = bbox4.cornersSSE[near.y][i] - originY[i];
+        tMins[i] = bbox4.cornersSSE[near.z][i] - originZ[i];
+        product0[i] = product0[i] * rdirY[i];
+        tMins[i] = tMins[i] * rdirZ[i];
+        product0[i] = fmax(product0[i], tMins[i]);
+        tMins[i] = bbox4.cornersSSE[near.x][i] - originX[i];
+        tMins[i] = tMins[i] * rdirX[i];
+        tMins[i] = fmax(rtMin[i], tMins[i]);
+        tMins[i] = fmax(product0[i], tMins[i]);
 
-    Timer timer;
-    for (int i = 0; i < numTests; i++) {
-        rayBBoxIntersect4Scalar(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
+        product0[i] = bbox4.cornersSSE[far.y][i] - originY[i];
+        tMaxs[i] = bbox4.cornersSSE[far.z][i] - originZ[i];
+        product0[i] = product0[i] * rdirY[i];
+        tMaxs[i] = tMaxs[i] * rdirZ[i];
+        product0[i] = fmin(product0[i], tMaxs[i]);
+        tMaxs[i] = bbox4.cornersSSE[far.x][i] - originX[i];
+        tMaxs[i] = tMaxs[i] * rdirX[i];
+        tMaxs[i] = fmin(rtMax[i], tMaxs[i]);
+        tMaxs[i] = fmin(product0[i], tMaxs[i]);
+
+        hits[i] = !(std::isnan(tMins[i]) || std::isnan(tMaxs[i]) || std::isinf(tMins[i]) ||
+                    std::isinf(tMaxs[i]));
     }
-    printResults("Scalar", timer.getElapsedMicroSec(), hits, tMins, tMaxs);
-
-    timer.start();
-    for (int i = 0; i < numTests; i++) {
-        rayBBoxIntersect4ScalarCompact(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
-    }
-    printResults("Scalar Compact", timer.getElapsedMicroSec(), hits, tMins, tMaxs);
-
-    timer.start();
-    for (int i = 0; i < numTests; i++) {
-        rayBBoxIntersect4SSE(ray, bbox4, hits, tMins, tMaxs);
-    }
-#if defined(__x86_64__)
-    printResults("SSE", timer.getElapsedMicroSec(), hits, tMins, tMaxs);
-#elif defined(__aarch64__)
-    printResults("SSE (via sse2neon)", timer.getElapsedMicroSec(), hits, tMins, tMaxs);
-#endif
-
-#if defined(__aarch64__)
-    timer.start();
-    for (int i = 0; i < numTests; i++) {
-        rayBBoxIntersect4Neon(ray, bbox4, hits, tMins, tMaxs);
-    }
-    printResults("Neon", timer.getElapsedMicroSec(), hits, tMins, tMaxs);
-#endif
-
-    return 0;
 }
