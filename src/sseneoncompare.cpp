@@ -88,12 +88,12 @@ struct BBox {
     };
 
     BBox(const FVec4& minCorner, const FVec4& maxCorner) {
-        cornersAlt[0][0] = std::min(minCorner.x, maxCorner.x);
-        cornersAlt[0][1] = std::min(minCorner.y, maxCorner.y);
-        cornersAlt[0][2] = std::min(minCorner.z, maxCorner.z);
-        cornersAlt[1][0] = std::max(minCorner.x, maxCorner.x);
-        cornersAlt[1][1] = std::max(minCorner.y, maxCorner.y);
-        cornersAlt[1][2] = std::max(minCorner.x, maxCorner.x);
+        cornersAlt[0][0] = fmin(minCorner.x, maxCorner.x);
+        cornersAlt[0][1] = fmin(minCorner.y, maxCorner.y);
+        cornersAlt[0][2] = fmin(minCorner.z, maxCorner.z);
+        cornersAlt[1][0] = fmax(minCorner.x, maxCorner.x);
+        cornersAlt[1][1] = fmax(minCorner.y, maxCorner.y);
+        cornersAlt[1][2] = fmax(minCorner.x, maxCorner.x);
     }
 
     FVec4 minCorner() const { return FVec4(corners[0], corners[1], corners[2]); }
@@ -119,12 +119,12 @@ struct BBox4 {
 #endif
 
     inline void setBBox(int boxNum, const FVec4& minCorner, const FVec4& maxCorner) {
-        cornersFloat[0][0][boxNum] = std::min(minCorner.x, maxCorner.x);
-        cornersFloat[0][1][boxNum] = std::min(minCorner.y, maxCorner.y);
-        cornersFloat[0][2][boxNum] = std::min(minCorner.z, maxCorner.z);
-        cornersFloat[1][0][boxNum] = std::max(minCorner.x, maxCorner.x);
-        cornersFloat[1][1][boxNum] = std::max(minCorner.y, maxCorner.y);
-        cornersFloat[1][2][boxNum] = std::max(minCorner.x, maxCorner.x);
+        cornersFloat[0][0][boxNum] = fmin(minCorner.x, maxCorner.x);
+        cornersFloat[0][1][boxNum] = fmin(minCorner.y, maxCorner.y);
+        cornersFloat[0][2][boxNum] = fmin(minCorner.z, maxCorner.z);
+        cornersFloat[1][0][boxNum] = fmax(minCorner.x, maxCorner.x);
+        cornersFloat[1][1][boxNum] = fmax(minCorner.y, maxCorner.y);
+        cornersFloat[1][2][boxNum] = fmax(minCorner.x, maxCorner.x);
     }
 
     BBox4(const BBox& a, const BBox& b, const BBox& c, const BBox& d) {
@@ -191,12 +191,12 @@ bool rayBBoxIntersectScalarCompact(const Ray& ray, const BBox& bbox, float& tMin
     IVec4 far(int(rdir.x >= 0.0f ? 3 : 0), int(rdir.y >= 0.0f ? 4 : 1),
               int(rdir.z >= 0.0f ? 5 : 2));
 
-    tMin = std::max(std::max(ray.tMin, (bbox.corners[near.x] - ray.origin.x) * rdir.x),
-                    std::max((bbox.corners[near.y] - ray.origin.y) * rdir.y,
-                             (bbox.corners[near.z] - ray.origin.z) * rdir.z));
-    tMax = std::min(std::min(ray.tMax, (bbox.corners[far.x] - ray.origin.x) * rdir.x),
-                    std::min((bbox.corners[far.y] - ray.origin.y) * rdir.y,
-                             (bbox.corners[far.z] - ray.origin.z) * rdir.z));
+    tMin = fmax(fmax(ray.tMin, (bbox.corners[near.x] - ray.origin.x) * rdir.x),
+                fmax((bbox.corners[near.y] - ray.origin.y) * rdir.y,
+                     (bbox.corners[near.z] - ray.origin.z) * rdir.z));
+    tMax = fmin(fmin(ray.tMax, (bbox.corners[far.x] - ray.origin.x) * rdir.x),
+                fmin((bbox.corners[far.y] - ray.origin.y) * rdir.y,
+                     (bbox.corners[far.z] - ray.origin.z) * rdir.z));
 
     if (std::isnan(tMin) || std::isnan(tMax) || std::isinf(tMin) || std::isinf(tMax)) {
         return false;
