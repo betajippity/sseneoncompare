@@ -18,7 +18,25 @@ struct Timer {
     }
 };
 
-int main() {
+int main(int argc, char* argv[]) {
+    int numTests = 100000;
+    if (argc > 1) {
+        numTests = std::atoi(argv[1]);
+        if (numTests <= 0) {
+            std::cout << "Tests must be run a positive number of times!" << std::endl;
+            return 0;
+        }
+        if (numTests < 1000) {
+            std::cout
+                << "Must run tests at least 1000 times; fewer than 1000 times is less reliable..."
+                << std::endl;
+            numTests = 1000;
+        }
+    }
+    std::cout << "Running tests " << numTests << (numTests == 1 ? " time" : " times") << "..."
+              << std::endl;
+    std::cout << std::endl;
+
     Ray ray(FVec4(0.0f, 1.0f, 0.0f), FVec4(0.0f, -1.0f, 0.0f), 0.0f, 100.0f);
     BBox bbox0(FVec4(-0.5f, -0.5f, -0.5f), FVec4(0.5f, 0.5f, 0.5f));
     BBox bbox1(FVec4(1.5f, 1.5f, 1.5f), FVec4(2.0f, 2.0f, 2.0f));
@@ -28,7 +46,10 @@ int main() {
 
     auto printResults = [&](const std::string& testName, long elapsedMicroSec, const IVec4& hits,
                             const FVec4& tMins, const FVec4& tMaxs) {
-        std::cout << testName << ": " << elapsedMicroSec << " μs" << std::endl;
+        std::cout << testName << ": " << 1000.0f * float(elapsedMicroSec) / float(numTests) << " ns"
+                  << std::endl;
+        std::cout << "  Total time for " << numTests << (numTests == 1 ? " run" : " runs") << ": "
+                  << elapsedMicroSec << " μs" << std::endl;
         for (size_t i = 0; i < 4; i++) {
             std::cout << "  Box " << i << " hit: " << (hits[i] == 1 ? "true" : "false")
                       << std::endl;
@@ -44,8 +65,6 @@ int main() {
 
     IVec4 hits;
     FVec4 tMins, tMaxs;
-
-    const int numTests = 1000;
 
     Timer timer;
     for (int i = 0; i < numTests; i++) {
