@@ -17,7 +17,9 @@ The arm64 build depends on [sse2neon](https://github.com/DLTcollab/sse2neon) for
 git clone --recursive
 ```
 
-You will need a modern C++ compiler with support for C++17.
+You will need a modern C++ compiler with support for C++17, and you will need a version of [ispc](https://ispc.github.io) with NEON support (v1.16.1 or newer).
+
+To build, you will need [CMake](https://cmake.org) 3.19 or newer.
 
 Build and Run
 ===
@@ -26,11 +28,12 @@ Build and Run
 cmake . && make && ./sseneoncompare
 ```
 
-On macOS 11 and up, using the above will automatically build a Universal Binary with x86_64 and arm64 support.
 The x86_64 build includes both scalar implementations and the SSE implementation.
 The arm64 build includes both scalar implementations, the SSE implementation (using [sse2neon](https://github.com/DLTcollab/sse2neon)), and the Neon implementation.
 
 When run, the program will run each ray-bounding-box intersection implementation 1000 times and report the total time taken.
+
+Unfortunately, on macOS 11 and up, automatically building a Universal Binary with x86_64 and arm64 support does not work due to CMake's ispc support not working with Universal Binary support yet.
 
 Licensing
 ===
