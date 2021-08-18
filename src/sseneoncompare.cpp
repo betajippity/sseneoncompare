@@ -230,5 +230,14 @@ void rayBBoxIntersect4ISPC(const Ray& ray,
                            FVec4& tMins,
                            FVec4& tMaxs) {
     ispc::rayBBoxIntersect4ISPC(ray.direction.data, ray.origin.data, ray.tMin, ray.tMax,
-                                bbox4.cornersFloatAlt, hits.data, tMins.data, tMaxs.data);
+                                bbox4.cornersFloatAlt, tMins.data, tMaxs.data);
+#if defined(__aarch64__)
+    uint32_t hit = neonCompareAndMask(tMins.f32x4, tMaxs.f32x4);
+#else
+    int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
+#endif
+    hits[0] = bool(hit & (1 << (0)));
+    hits[1] = bool(hit & (1 << (1)));
+    hits[2] = bool(hit & (1 << (2)));
+    hits[3] = bool(hit & (1 << (3)));
 }
