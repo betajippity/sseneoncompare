@@ -95,6 +95,7 @@ struct BBox4 {
         float32x4_t cornersNeon[6];
 #endif
         float cornersFloat[2][3][4];  // indexed as corner[minOrMax][XYZ][bboxNumber]
+        float cornersFloatAlt[6][4];
     };
 
     inline __m128* minCornerSSE() { return &cornersSSE[0]; }
@@ -176,5 +177,12 @@ void rayBBoxIntersect4AutoVectorize(const Ray& ray,
                                     IVec4& hits,
                                     FVec4& tMins,
                                     FVec4& tMaxs);
+
+// Wrapper to call ISPC version of the compact Williams et al. 2005 implementation
+void rayBBoxIntersect4ISPC(const Ray& ray,
+                           const BBox4& bbox4,
+                           IVec4& hits,
+                           FVec4& tMins,
+                           FVec4& tMaxs);
 
 #endif

@@ -102,5 +102,11 @@ int main(int argc, char* argv[]) {
     }
     printResults("Autovectorize", timer.getElapsedTime(), hits, tMins, tMaxs);
 
+    timer.start();
+    for (int i = 0; i < numTests; i++) {
+        rayBBoxIntersect4ISPC(ray, bbox4, hits, tMins, tMaxs);
+    }
+    printResults("ISPC", timer.getElapsedTime(), hits, tMins, tMaxs);
+
     return 0;
 }

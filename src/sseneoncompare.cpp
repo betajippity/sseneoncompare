@@ -1,4 +1,5 @@
 #include "sseneoncompare.hpp"
+#include "bbox4_ispc.h"
 
 /* A direct implementation of "An Efficient and Robust Ray-Box Intersection Algorithm" by
    Amy Williams et al. 2005; DOI: 10.1080/2151237X.2005.10129188 */
@@ -221,4 +222,13 @@ void rayBBoxIntersect4AutoVectorize(const Ray& ray,
         hits[i] = !(std::isnan(tMins[i]) || std::isnan(tMaxs[i]) || std::isinf(tMins[i]) ||
                     std::isinf(tMaxs[i]));
     }
+}
+
+void rayBBoxIntersect4ISPC(const Ray& ray,
+                           const BBox4& bbox4,
+                           IVec4& hits,
+                           FVec4& tMins,
+                           FVec4& tMaxs) {
+    ispc::rayBBoxIntersect4ISPC(ray.direction.data, ray.origin.data, ray.tMin, ray.tMax,
+                                bbox4.cornersFloatAlt, hits.data, tMins.data, tMaxs.data);
 }
