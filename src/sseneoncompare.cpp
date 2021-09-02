@@ -111,13 +111,13 @@ void rayBBoxIntersect4SSE(const Ray& ray,
               int(rdir.z >= 0.0f ? 5 : 2));
 
     tMins = FVec4(_mm_max_ps(
-        _mm_max_ps(_mm_set1_ps(ray.tMin), (bbox4.cornersSSE[near.x] - originX.m128) * rdirX.m128),
-        _mm_max_ps((bbox4.cornersSSE[near.y] - originY.m128) * rdirY.m128,
-                   (bbox4.cornersSSE[near.z] - originZ.m128) * rdirZ.m128)));
+        _mm_max_ps(_mm_set1_ps(ray.tMin), (bbox4.corners[near.x].m128 - originX.m128) * rdirX.m128),
+        _mm_max_ps((bbox4.corners[near.y].m128 - originY.m128) * rdirY.m128,
+                   (bbox4.corners[near.z].m128 - originZ.m128) * rdirZ.m128)));
     tMaxs = FVec4(_mm_min_ps(
-        _mm_min_ps(_mm_set1_ps(ray.tMax), (bbox4.cornersSSE[far.x] - originX.m128) * rdirX.m128),
-        _mm_min_ps((bbox4.cornersSSE[far.y] - originY.m128) * rdirY.m128,
-                   (bbox4.cornersSSE[far.z] - originZ.m128) * rdirZ.m128)));
+        _mm_min_ps(_mm_set1_ps(ray.tMax), (bbox4.corners[far.x].m128 - originX.m128) * rdirX.m128),
+        _mm_min_ps((bbox4.corners[far.y].m128 - originY.m128) * rdirY.m128,
+                   (bbox4.corners[far.z].m128 - originZ.m128) * rdirZ.m128)));
 
     int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
     hits[0] = bool(hit & (1 << (0)));
@@ -156,14 +156,15 @@ void rayBBoxIntersect4Neon(const Ray& ray,
     IVec4 far(int(rdir.x >= 0.0f ? 3 : 0), int(rdir.y >= 0.0f ? 4 : 1),
               int(rdir.z >= 0.0f ? 5 : 2));
 
-    tMins = FVec4(vmaxq_f32(
-        vmaxq_f32(vdupq_n_f32(ray.tMin), (bbox4.cornersNeon[near.x] - originX.f32x4) * rdirX.f32x4),
-        vmaxq_f32((bbox4.cornersNeon[near.y] - originY.f32x4) * rdirY.f32x4,
-                  (bbox4.cornersNeon[near.z] - originZ.f32x4) * rdirZ.f32x4)));
-    tMaxs = FVec4(vminq_f32(
-        vminq_f32(vdupq_n_f32(ray.tMax), (bbox4.cornersNeon[far.x] - originX.f32x4) * rdirX.f32x4),
-        vminq_f32((bbox4.cornersNeon[far.y] - originY.f32x4) * rdirY.f32x4,
-                  (bbox4.cornersNeon[far.z] - originZ.f32x4) * rdirZ.f32x4)));
+    tMins =
+        FVec4(vmaxq_f32(vmaxq_f32(vdupq_n_f32(ray.tMin),
+                                  (bbox4.corners[near.x].f32x4 - originX.f32x4) * rdirX.f32x4),
+                        vmaxq_f32((bbox4.corners[near.y].f32x4 - originY.f32x4) * rdirY.f32x4,
+                                  (bbox4.corners[near.z].f32x4 - originZ.f32x4) * rdirZ.f32x4)));
+    tMaxs = FVec4(vminq_f32(vminq_f32(vdupq_n_f32(ray.tMax),
+                                      (bbox4.corners[far.x].f32x4 - originX.f32x4) * rdirX.f32x4),
+                            vminq_f32((bbox4.corners[far.y].f32x4 - originY.f32x4) * rdirY.f32x4,
+                                      (bbox4.corners[far.z].f32x4 - originZ.f32x4) * rdirZ.f32x4)));
 
     uint32_t hit = neonCompareAndMask(tMins.f32x4, tMaxs.f32x4);
     hits[0] = bool(hit & (1 << (0)));
@@ -199,22 +200,22 @@ void rayBBoxIntersect4AutoVectorize(const Ray& ray,
 
 #pragma clang loop vectorize(enable)
     for (int i = 0; i < 4; i++) {
-        product0[i] = bbox4.cornersSSE[near.y][i] - originY[i];
-        tMins[i] = bbox4.cornersSSE[near.z][i] - originZ[i];
+        product0[i] = bbox4.corners[near.y][i] - originY[i];
+        tMins[i] = bbox4.corners[near.z][i] - originZ[i];
         product0[i] = product0[i] * rdirY[i];
         tMins[i] = tMins[i] * rdirZ[i];
         product0[i] = fmax(product0[i], tMins[i]);
-        tMins[i] = bbox4.cornersSSE[near.x][i] - originX[i];
+        tMins[i] = bbox4.corners[near.x][i] - originX[i];
         tMins[i] = tMins[i] * rdirX[i];
         tMins[i] = fmax(rtMin[i], tMins[i]);
         tMins[i] = fmax(product0[i], tMins[i]);
 
-        product0[i] = bbox4.cornersSSE[far.y][i] - originY[i];
-        tMaxs[i] = bbox4.cornersSSE[far.z][i] - originZ[i];
+        product0[i] = bbox4.corners[far.y][i] - originY[i];
+        tMaxs[i] = bbox4.corners[far.z][i] - originZ[i];
         product0[i] = product0[i] * rdirY[i];
         tMaxs[i] = tMaxs[i] * rdirZ[i];
         product0[i] = fmin(product0[i], tMaxs[i]);
-        tMaxs[i] = bbox4.cornersSSE[far.x][i] - originX[i];
+        tMaxs[i] = bbox4.corners[far.x][i] - originX[i];
         tMaxs[i] = tMaxs[i] * rdirX[i];
         tMaxs[i] = fmin(rtMax[i], tMaxs[i]);
         tMaxs[i] = fmin(product0[i], tMaxs[i]);

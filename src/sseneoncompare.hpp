@@ -90,20 +90,17 @@ struct BBox {
 
 struct BBox4 {
     union {
-        __m128 cornersSSE[6];  // order: minX, minY, minZ, maxX, maxY, maxZ
-#if defined(__aarch64__)
-        float32x4_t cornersNeon[6];
-#endif
+        FVec4 corners[6];             // order: minX, minY, minZ, maxX, maxY, maxZ
         float cornersFloat[2][3][4];  // indexed as corner[minOrMax][XYZ][bboxNumber]
         float cornersFloatAlt[6][4];
     };
 
-    inline __m128* minCornerSSE() { return &cornersSSE[0]; }
-    inline __m128* maxCornerSSE() { return &cornersSSE[3]; }
+    inline __m128* minCornerSSE() { return &corners[0].m128; }
+    inline __m128* maxCornerSSE() { return &corners[3].m128; }
 
 #if defined(__aarch64__)
-    inline float32x4_t* minCornerNeon() { return &cornersNeon[0]; }
-    inline float32x4_t* maxCornerNeon() { return &cornersNeon[3]; }
+    inline float32x4_t* minCornerNeon() { return &corners[0].f32x4; }
+    inline float32x4_t* maxCornerNeon() { return &corners[3].f32x4; }
 #endif
 
     inline void setBBox(int boxNum, const FVec4& minCorner, const FVec4& maxCorner) {
