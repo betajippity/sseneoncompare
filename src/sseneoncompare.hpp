@@ -141,6 +141,16 @@ void rayBBoxIntersect4Scalar(const Ray& ray,
                              FVec4& tMins,
                              FVec4& tMaxs);
 
+/* Same as ayBBoxIntersect4Scalar(), but with early outs removed */
+void rayBBoxIntersect4ScalarNoEarlyOut(const Ray& ray,
+                                       const BBox& bbox0,
+                                       const BBox& bbox1,
+                                       const BBox& bbox2,
+                                       const BBox& bbox3,
+                                       IVec4& hits,
+                                       FVec4& tMins,
+                                       FVec4& tMaxs);
+
 /* A much more compact implementation of Williams et al. 2005; this implementation does not
    calculate a negative tMin if the ray origin is inside of the box. */
 void rayBBoxIntersect4ScalarCompact(const Ray& ray,

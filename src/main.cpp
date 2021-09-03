@@ -74,6 +74,12 @@ int main(int argc, char* argv[]) {
 
     timer.start();
     for (int i = 0; i < numTests; i++) {
+        rayBBoxIntersect4ScalarNoEarlyOut(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
+    }
+    printResults("Scalar (No Early-Out)", timer.getElapsedTime(), hits, tMins, tMaxs);
+
+    timer.start();
+    for (int i = 0; i < numTests; i++) {
         rayBBoxIntersect4ScalarCompact(ray, bbox0, bbox1, bbox2, bbox3, hits, tMins, tMaxs);
     }
     printResults("Scalar Compact", timer.getElapsedTime(), hits, tMins, tMaxs);

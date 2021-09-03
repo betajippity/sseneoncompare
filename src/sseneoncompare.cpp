@@ -38,6 +38,44 @@ bool rayBBoxIntersectScalar(const Ray& ray, const BBox& bbox, float& tMin, float
     return ((tMin < ray.tMax) && (tMax > ray.tMin));
 }
 
+/* A direct implementation of "An Efficient and Robust Ray-Box Intersection Algorithm" by
+   Amy Williams et al. 2005, but with early-outs removed. */
+bool rayBBoxIntersectScalarNoEarlyOut(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
+    FVec4 rdir = 1.0f / ray.direction;
+    int sign[3];
+    sign[0] = (rdir.x < 0);
+    sign[1] = (rdir.y < 0);
+    sign[2] = (rdir.z < 0);
+
+    float tyMin, tyMax, tzMin, tzMax;
+    tMin = (bbox.cornersAlt[sign[0]][0] - ray.origin.x) * rdir.x;
+    tMax = (bbox.cornersAlt[1 - sign[0]][0] - ray.origin.x) * rdir.x;
+    tyMin = (bbox.cornersAlt[sign[1]][1] - ray.origin.y) * rdir.y;
+    tyMax = (bbox.cornersAlt[1 - sign[1]][1] - ray.origin.y) * rdir.y;
+    bool foundHit = true;
+    if ((tMin > tyMax) || (tyMin > tMax)) {
+        foundHit = false;
+    }
+    if (tyMin > tMin) {
+        tMin = tyMin;
+    }
+    if (tyMax < tMax) {
+        tMax = tyMax;
+    }
+    tzMin = (bbox.cornersAlt[sign[2]][2] - ray.origin.z) * rdir.z;
+    tzMax = (bbox.cornersAlt[1 - sign[2]][2] - ray.origin.z) * rdir.z;
+    if ((tMin > tzMax) || (tzMin > tMax)) {
+        foundHit = false;
+    }
+    if (tzMin > tMin) {
+        tMin = tzMin;
+    }
+    if (tzMax < tMax) {
+        tMax = tzMax;
+    }
+    return ((tMin < ray.tMax) && (tMax > ray.tMin)) || foundHit;
+}
+
 /* A much more compact implementation of Williams et al. 2005; this implementation does not
    calculate a negative tMin if the ray origin is inside of the box. */
 bool rayBBoxIntersectScalarCompact(const Ray& ray, const BBox& bbox, float& tMin, float& tMax) {
@@ -73,6 +111,20 @@ void rayBBoxIntersect4Scalar(const Ray& ray,
     hits[1] = (int)rayBBoxIntersectScalar(ray, bbox1, tMins[1], tMaxs[1]);
     hits[2] = (int)rayBBoxIntersectScalar(ray, bbox2, tMins[2], tMaxs[2]);
     hits[3] = (int)rayBBoxIntersectScalar(ray, bbox3, tMins[3], tMaxs[3]);
+}
+
+void rayBBoxIntersect4ScalarNoEarlyOut(const Ray& ray,
+                                       const BBox& bbox0,
+                                       const BBox& bbox1,
+                                       const BBox& bbox2,
+                                       const BBox& bbox3,
+                                       IVec4& hits,
+                                       FVec4& tMins,
+                                       FVec4& tMaxs) {
+    hits[0] = (int)rayBBoxIntersectScalarNoEarlyOut(ray, bbox0, tMins[0], tMaxs[0]);
+    hits[1] = (int)rayBBoxIntersectScalarNoEarlyOut(ray, bbox1, tMins[1], tMaxs[1]);
+    hits[2] = (int)rayBBoxIntersectScalarNoEarlyOut(ray, bbox2, tMins[2], tMaxs[2]);
+    hits[3] = (int)rayBBoxIntersectScalarNoEarlyOut(ray, bbox3, tMins[3], tMaxs[3]);
 }
 
 void rayBBoxIntersect4ScalarCompact(const Ray& ray,
