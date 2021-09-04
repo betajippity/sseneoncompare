@@ -153,9 +153,9 @@ void rayBBoxIntersect4SSE(const Ray& ray,
     FVec4 rdirX(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(0, 0, 0, 0)));
     FVec4 rdirY(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(1, 1, 1, 1)));
     FVec4 rdirZ(_mm_shuffle_ps(rdir.m128, rdir.m128, _MM_SHUFFLE(2, 2, 2, 2)));
-    FVec4 originX(_mm_set1_ps(ray.origin.x));
-    FVec4 originY(_mm_set1_ps(ray.origin.y));
-    FVec4 originZ(_mm_set1_ps(ray.origin.z));
+    FVec4 originX(_mm_shuffle_ps(ray.origin.m128, ray.origin.m128, _MM_SHUFFLE(0, 0, 0, 0)));
+    FVec4 originY(_mm_shuffle_ps(ray.origin.m128, ray.origin.m128, _MM_SHUFFLE(1, 1, 1, 1)));
+    FVec4 originZ(_mm_shuffle_ps(ray.origin.m128, ray.origin.m128, _MM_SHUFFLE(2, 2, 2, 2)));
 
     IVec4 near(int(rdir.x >= 0.0f ? 0 : 3), int(rdir.y >= 0.0f ? 1 : 4),
                int(rdir.z >= 0.0f ? 2 : 5));
