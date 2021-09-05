@@ -92,11 +92,7 @@ bool rayBBoxIntersectScalarCompact(const Ray& ray, const BBox& bbox, float& tMin
                 fmin((bbox.corners[far.y] - ray.origin.y) * rdir.y,
                      (bbox.corners[far.z] - ray.origin.z) * rdir.z));
 
-    if (std::isnan(tMin) || std::isnan(tMax) || std::isinf(tMin) || std::isinf(tMax)) {
-        return false;
-    } else {
-        return true;
-    }
+    return tMin <= tMax;
 }
 
 void rayBBoxIntersect4Scalar(const Ray& ray,
@@ -272,8 +268,7 @@ void rayBBoxIntersect4AutoVectorize(const Ray& ray,
         tMaxs[i] = fmin(rtMax[i], tMaxs[i]);
         tMaxs[i] = fmin(product0[i], tMaxs[i]);
 
-        hits[i] = !(std::isnan(tMins[i]) || std::isnan(tMaxs[i]) || std::isinf(tMins[i]) ||
-                    std::isinf(tMaxs[i]));
+        hits[i] = tMins[i] <= tMaxs[i];
     }
 }
 
