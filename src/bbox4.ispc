@@ -6,7 +6,8 @@ export void rayBBoxIntersect4ISPC(const uniform float rayDirection[3],
                                   const uniform float rayTMax,
                                   const uniform float bbox4corners[6][4],
                                   uniform float tMins[4],
-                                  uniform float tMaxs[4]) {
+                                  uniform float tMaxs[4],
+                                  uniform int hits[4]) {
     uniform float3 rdir = { 1.0f / rayDirection[0], 1.0f / rayDirection[1],
                             1.0f / rayDirection[2] };
 
@@ -39,5 +40,6 @@ export void rayBBoxIntersect4ISPC(const uniform float rayDirection[3],
         tMaxs[i] = min(min(rayTMax, (bbox4corners[far[0]][i] - rayOrigin[0]) * rdir.x),
                        min((bbox4corners[far[1]][i] - rayOrigin[1]) * rdir.y,
                            (bbox4corners[far[2]][i] - rayOrigin[2]) * rdir.z));
+        hits[i] = tMins[i] <= tMaxs[i];
     }
 }
