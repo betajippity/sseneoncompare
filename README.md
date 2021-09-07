@@ -4,8 +4,8 @@ A small SSE Neon comparison
 This project is a small example comparison of 4-wide ray-bounding-box intersection implemented using two different scalar approaches, using SSE, and using Neon.
 The specific ray-bounding-box intersection algorithm implemented is adapted from ["An Efficient and Robust Ray-Box Intersection Algorithm"](https://doi.org/10.1080/2151237X.2005.10129188) by Amy Williams, Steve Barrus, Keith Morley, and Peter Shirley, 2005.
 
-This project is an accompaniment to my blog post, ["Porting Takua Renderer to 64-bit ARM- Part 2"](https://blog.yiningkarlli.com/2021/07/porting-takua-to-arm-pt2.html).
-For a thorough walkthrough of the code and explaination for what the code does, please see the blog post.
+This project is an accompaniment to my blog post, ["Comparing SIMD on x86-64 and arm64"](https://blog.yiningkarlli.com/2021/09/neon-vs-sse.html).
+For a thorough walkthrough of the code and explanation for what the code does, please see the blog post.
 
 Dependencies
 ===
@@ -17,7 +17,7 @@ The arm64 build depends on [sse2neon](https://github.com/DLTcollab/sse2neon) for
 git clone --recursive
 ```
 
-You will need a modern C++ compiler with support for C++17, and you will need a version of [ispc](https://ispc.github.io) with NEON support (v1.16.1 or newer).
+You will need a modern C++ compiler with support for C++17, and you will need a version of [ispc](https://ispc.github.io) with Neon support (v1.16.1 or newer).
 
 To build, you will need [CMake](https://cmake.org) 3.19 or newer.
 
