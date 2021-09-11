@@ -176,13 +176,6 @@ void rayBBoxIntersect4SSE(const Ray& ray,
 
 #if defined(__aarch64__)
 
-inline uint32_t neonCompareAndMask(const float32x4_t& a, const float32x4_t& b) {
-    uint32x4_t compResUint = vcleq_f32(a, b);
-    static const int32x4_t shift = { 0, 1, 2, 3 };
-    uint32x4_t tmp = vshrq_n_u32(compResUint, 31);
-    return vaddvq_u32(vshlq_u32(tmp, shift));
-}
-
 // Neon version of the compact Williams et al. 2005 implementation
 void rayBBoxIntersect4Neon(const Ray& ray,
                            const BBox4& bbox4,
@@ -213,12 +206,7 @@ void rayBBoxIntersect4Neon(const Ray& ray,
                                       (bbox4.corners[far.x].f32x4 - originX.f32x4) * rdirX.f32x4),
                             vminq_f32((bbox4.corners[far.y].f32x4 - originY.f32x4) * rdirY.f32x4,
                                       (bbox4.corners[far.z].f32x4 - originZ.f32x4) * rdirZ.f32x4)));
-
-    uint32_t hit = neonCompareAndMask(tMins.f32x4, tMaxs.f32x4);
-    hits[0] = bool(hit & (1 << (0)));
-    hits[1] = bool(hit & (1 << (1)));
-    hits[2] = bool(hit & (1 << (2)));
-    hits[3] = bool(hit & (1 << (3)));
+    hits.i32x4 = vreinterpretq_s32_u32(vshrq_n_u32(vcleq_f32(tMins.f32x4, tMaxs.f32x4), 31));
 }
 
 #endif
