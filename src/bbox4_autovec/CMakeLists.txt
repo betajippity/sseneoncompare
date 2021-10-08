@@ -1,15 +1,12 @@
 cmake_minimum_required(VERSION 3.19.0)
 
-project(bbox4 C CXX ISPC)
+project(bbox4_autovec C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include_directories(${ISPC_HEADER_DIRECTORY})
-
-set(SOURCE_FILES "sseneoncompare.cpp")
-set(SOURCE_FILES ${SOURCE_FILES} "bbox4.ispc")
+set(SOURCE_FILES "../sseneoncompare_autovec.cpp")
 
 set(CMAKE_CXX_FLAGS "-O3 -ffast-math")
 
@@ -27,4 +24,4 @@ else()
     set(CMAKE_ISPC_FLAGS "--target=sse4 -O3")
 endif()
 
-add_library(bbox4 ${SOURCE_FILES})
+add_library(bbox4_autovec ${SOURCE_FILES})
