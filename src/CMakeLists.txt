@@ -11,7 +11,7 @@ include_directories(${ISPC_HEADER_DIRECTORY})
 set(SOURCE_FILES "sseneoncompare.cpp")
 set(SOURCE_FILES ${SOURCE_FILES} "bbox4.ispc")
 
-set(CMAKE_CXX_FLAGS "-O3")
+set(CMAKE_CXX_FLAGS "-O3 -ffast-math")
 
 EXECUTE_PROCESS( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE )
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
