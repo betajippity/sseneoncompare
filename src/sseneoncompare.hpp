@@ -51,6 +51,7 @@ inline FVec4 operator/(const float& a, const FVec4& b) {
 
 struct IVec4 {
     union {
+        __m128i m128i;
 #if defined(__aarch64__)
         int32x4_t i32x4;
 #endif

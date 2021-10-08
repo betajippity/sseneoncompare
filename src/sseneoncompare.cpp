@@ -167,11 +167,12 @@ void rayBBoxIntersect4SSE(const Ray& ray,
         _mm_min_ps((bbox4.corners[far.y].m128 - originY.m128) * rdirY.m128,
                    (bbox4.corners[far.z].m128 - originZ.m128) * rdirZ.m128)));
 
-    int hit = ((1 << 4) - 1) & _mm_movemask_ps(_mm_cmple_ps(tMins.m128, tMaxs.m128));
-    hits[0] = bool(hit & (1 << (0)));
-    hits[1] = bool(hit & (1 << (1)));
-    hits[2] = bool(hit & (1 << (2)));
-    hits[3] = bool(hit & (1 << (3)));
+    auto mm_cmple_ps = [&](__m128 a, __m128 b) -> __m128i {
+        __m128 res;
+        res = _mm_cmple_ps(a, b);
+        return *(__m128i*)&res;
+    };
+    hits.m128i = _mm_srli_epi32(mm_cmple_ps(tMins.m128, tMaxs.m128), 31);
 }
 
 #if defined(__aarch64__)
