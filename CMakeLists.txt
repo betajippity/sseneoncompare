@@ -11,6 +11,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(SOURCE_FILES "src/main.cpp")
 
-set(CMAKE_CXX_FLAGS "-O0")
+set(CMAKE_CXX_FLAGS "-O1")
 add_executable(sseneoncompare ${SOURCE_FILES})
 target_link_libraries(sseneoncompare bbox4 bbox4_autovec)

@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
 
     timer.start();
     for (int i = 0; i < numTests; i++) {
-        rayBBoxIntersect4AutoVectorize(ray, bbox4, hits, tMins, tMaxs);
+        std::tie(hits, tMins, tMaxs) = rayBBoxIntersect4AutoVectorize(ray, bbox4);
     }
     printResults("Autovectorize", timer.getElapsedTime(), hits, tMins, tMaxs);
 
