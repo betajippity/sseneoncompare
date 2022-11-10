@@ -3,6 +3,7 @@
 #define SSENEONCOMPARE_HPP
 
 #include <cmath>
+#include <tuple>
 
 #if defined(__x86_64__)
 #include <xmmintrin.h>
@@ -183,11 +184,8 @@ void rayBBoxIntersect4Neon(const Ray& ray,
 #endif
 
 // Compact scalar version written to be easily autovectorized
-void rayBBoxIntersect4AutoVectorize(const Ray& ray,
-                                    const BBox4& bbox4,
-                                    IVec4& hits,
-                                    FVec4& tMins,
-                                    FVec4& tMaxs);
+std::tuple<IVec4,FVec4,FVec4> rayBBoxIntersect4AutoVectorize(const Ray& ray,
+                                    const BBox4& bbox4);
 
 // Wrapper to call ISPC version of the compact Williams et al. 2005 implementation
 void rayBBoxIntersect4ISPC(const Ray& ray,
